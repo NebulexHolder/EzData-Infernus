@@ -1,2 +1,2 @@
 # EzData-Infernus
-Addon module for EzData-Strix (Can also be used by itself) that allows you to use Google's firebase application with ROBLOX.
+Simple Custom ROBLOX Module For Saving Data From Roblox Externally To Google's Firebase Service.
