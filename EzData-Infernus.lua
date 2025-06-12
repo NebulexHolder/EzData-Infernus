@@ -1,0 +1,140 @@
+------------
+--Services--
+------------
+
+local HttpService = game:GetService("HttpService")
+
+----------
+--Tables--
+----------
+
+local Infernus = {}
+
+-------------
+--Functions--
+-------------
+
+function Infernus:DoOperation(Firebase: string, Scope: string, Key: string, AuthKey: string, URL: string, OperationData: {})
+	
+	local OperationType = OperationData["T"]
+	local OperationData = OperationData["D"] -- Not always will be given
+	
+	local ToSend = {
+		
+		Url = OperationType == "URL" and URL .. ".json?auth=" .. AuthKey or OperationType == "RO" and URL .. "/" .. Firebase .. ".json?auth=" .. AuthKey or Scope and URL .. "/" .. Firebase .. "/" .. Scope .. "/" .. Key .. ".json?auth=" .. AuthKey or URL .. "/" .. Firebase .. "/" .. Key .. ".json?auth=" .. AuthKey,
+		Method = OperationType == "S" and "PUT" or (OperationType == "G" or OperationType == "RO" or OperationType == "URL") and "GET" or OperationType == "R" and "DELETE" or OperationType == "P" and "PATCH",
+		Body = OperationData and typeof(OperationData) == "table" and HttpService:JSONEncode(OperationData) or OperationData and tostring(OperationData),
+		Headers = {
+			["Content-Type"] = "application/json",
+			--["Authorization"] = "Bearer " .. AuthKey
+		},
+
+	}
+	
+	local Success, Data = pcall(function()
+		
+		return HttpService:RequestAsync(ToSend)
+		
+	end)
+	
+	if not Success then
+		
+		task.wait(3)
+		return Infernus:DoOperation(Firebase, Scope, Key, AuthKey, URL, OperationData) -- Retry
+		
+	end
+	
+	return Data
+	
+end
+
+function Infernus:Setup(AuthKey: string, URL: string)
+	
+	local Firebase = {}
+	function Firebase:GetFireBase(Name: string, Scope: string)
+		
+		local MainFirebase = {}
+		function MainFirebase:GetAsync(Key: string)
+
+			assert(Key, "EzData-Infernus; GetAsync failed because no valid key was given!")
+			
+			local GrabbedData = Infernus:DoOperation(Name, Scope, Key, AuthKey, URL, {["T"] = "G"})
+			if not GrabbedData or not GrabbedData["Body"] then
+				
+				return
+				
+			end
+			
+			return HttpService:JSONDecode(GrabbedData["Body"])
+
+		end
+
+		function MainFirebase:SetAsync(Key: string, Data)
+
+			assert(Key, "EzData-Infernus; GetAsync failed because no valid key was given!") -- Throw an error if no key was given
+			assert(Data, "EzData-Infernus; SetAsync failed because no valid data was given!") -- Throw an error if no data was given
+			
+			print("Sending")
+			
+			Infernus:DoOperation(Name, Scope, Key, AuthKey, URL, {["T"] = "S", ["D"] = Data})
+
+		end
+		
+		function MainFirebase:PatchAsync(Key: string, Data)
+			
+			assert(Key, "EzData-Infernus; PatchAsync failed because no valid key was given!") -- Throw an error if no key was given
+			assert(Data, "EzData-Infernus; PatchAsync failed because no valid data was given!") -- Throw an error if no data was given
+			
+			Infernus:DoOperation(Name, Scope, Key, AuthKey, URL, {["T"] = "P", ["D"] = Data})
+			
+		end
+		
+		function MainFirebase:RemoveAsync(Key: string)
+			
+			assert(Key, "EzData-Infernus; RemoveAsync failed because no valid key was given!") -- Throw an error if no key was given
+			Infernus:DoOperation(Name, Scope, Key, AuthKey, URL, {["T"] = "R"})
+			
+		end
+
+		function MainFirebase:GetRootAsync()
+
+			local GrabbedData = Infernus:DoOperation(Name, Scope, nil, AuthKey, URL, {["T"] = "RO"})
+			if not GrabbedData or not GrabbedData["Body"] then
+
+				return
+
+			end
+
+			return HttpService:JSONDecode(GrabbedData["Body"])
+
+
+		end
+
+		return MainFirebase
+
+	end
+	
+	function Firebase:GetRootAsync()
+		
+		local GrabbedData = Infernus:DoOperation(nil, nil, nil, AuthKey, URL, {["T"] = "URL"})
+		if not GrabbedData or not GrabbedData["Body"] then
+
+			return
+
+		end
+
+		return HttpService:JSONDecode(GrabbedData["Body"])
+		
+	end
+	
+	return Firebase
+	
+end
+
+
+
+--------
+--Main--
+--------
+
+return Infernus
