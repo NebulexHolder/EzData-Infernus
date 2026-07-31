@@ -43,17 +43,16 @@ local Infernus = {}
 function Infernus:DoOperation(Firebase: string, Scope: string, Key: string, AuthKey: string, URL: string, OperationData: {})
 	
 	local ToSend 
+	
 	local Success, Err =	pcall(function()
 		
 		local OperationType = OperationData["T"]
 		local OperationData = OperationData["D"] -- Not always will be given
 		
-		print(OperationType == "URL" and URL .. ".json?auth=" .. AuthKey or (OperationType == "RO" or OperationType == "ROD") and URL .. "/" .. Firebase .. ".json?auth=" .. AuthKey or Scope and URL .. "/" .. Firebase .. "/" .. Scope .. "/" .. Key .. ".json?auth=" .. AuthKey or URL .. "/" .. Firebase .. "/" .. Key .. ".json?auth=" .. AuthKey)
-
 		ToSend = {
 
-			Url = OperationType == "URL" and URL .. ".json?auth=" .. AuthKey or (OperationType == "RO" or OperationType == "ROD") and URL .. "/" .. Firebase .. ".json?auth=" .. AuthKey or Scope and URL .. "/" .. Firebase .. "/" .. Scope .. "/" .. Key .. ".json?auth=" .. AuthKey or URL .. "/" .. Firebase .. "/" .. Key .. ".json?auth=" .. AuthKey,
-			Method = OperationType == "S" and "PUT" or (OperationType == "G" or OperationType == "RO" or OperationType == "URL") and "GET" or (OperationType == "R" or OperationType == "ROD") and "DELETE" or OperationType == "P" and "PATCH",
+			Url = OperationType == "URL" and URL .. ".json?auth=" .. AuthKey or (OperationType == "RO" or OperationType == "ROD") and URL .. "/" .. Firebase .. ".json?auth=" .. AuthKey or (OperationType == "FR") and URL .. "/" .. Firebase .. ".json?auth=" .. AuthKey or Scope and URL .. "/" .. Firebase .. "/" .. Scope .. "/" .. Key .. ".json?auth=" .. AuthKey or URL .. "/" .. Firebase .. "/" .. Key .. ".json?auth=" .. AuthKey,
+			Method = OperationType == "S" and "PUT" or (OperationType == "G" or OperationType == "RO" or OperationType == "URL") and "GET" or (OperationType == "R" or OperationType == "ROD" or OperationType == "FR") and "DELETE" or OperationType == "P" and "PATCH",
 			Body = OperationData and typeof(OperationData) == "table" and HttpService:JSONEncode(OperationData) or OperationData and tostring(OperationData),
 			Headers = {
 				["Content-Type"] = "application/json",
@@ -63,12 +62,6 @@ function Infernus:DoOperation(Firebase: string, Scope: string, Key: string, Auth
 		}
 		
 	end)
-	
-	if not Success then
-		
-		warn(Err, OperationData)
-		
-	end
 
 	local Success, Data = pcall(function()
 		
@@ -77,15 +70,17 @@ function Infernus:DoOperation(Firebase: string, Scope: string, Key: string, Auth
 	end)
 
 	if not Success then
-		
+
 		task.wait(3)
 		return Infernus:DoOperation(Firebase, Scope, Key, AuthKey, URL, OperationData) -- Retry
 
 	end
 	
 	if not Data.Success then
+		
 		warn("Firebase error:", Data.StatusCode, Data.Body)
 		return nil
+		
 	end
 
 	return Data
@@ -149,6 +144,7 @@ function Infernus:Setup(AuthKey: string, URL: string)
 
 			return HttpService:JSONDecode(GrabbedData["Body"])
 
+
 		end
 		
 		function MainFirebase:PurgeRootAsync()
@@ -179,14 +175,21 @@ function Infernus:Setup(AuthKey: string, URL: string)
 		return HttpService:JSONDecode(GrabbedData["Body"])
 
 	end
+	
+	function Firebase:RemoveAsync(Key: string)
+		
+		Infernus:DoOperation(Key, nil, nil, AuthKey, URL, {["T"] = "FR"})
+		
+	end
 
 	return Firebase
 
 end
+
+
 
 --------
 --Main--
 --------
 
 return Infernus
-
